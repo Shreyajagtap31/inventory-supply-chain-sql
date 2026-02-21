@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory & Supply Chain Dashboard 2024</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e2d45;
+    --high: #ef4444;
+    --high-glow: rgba(239,68,68,0.15);
+    --med: #f59e0b;
+    --med-glow: rgba(245,158,11,0.15);
+    --low: #10b981;
+    --low-glow: rgba(16,185,129,0.15);
+    --accent: #3b82f6;
+    --accent-glow: rgba(59,130,246,0.15);
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'DM Mono', monospace;
+    --display: 'Syne', sans-serif;
+    --body: 'DM Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  /* Animated background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; }
+
+  /* Header */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header-left {}
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tag::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: #fff;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .header-meta {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* KPI Row */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+    cursor: default;
+  }
+  .kpi:hover { transform: translateY(-2px); }
+
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .kpi.blue::before  { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+  .kpi.red::before   { background: var(--high);   box-shadow: 0 0 12px var(--high); }
+  .kpi.amber::before { background: var(--med);    box-shadow: 0 0 12px var(--med); }
+  .kpi.green::before { background: var(--low);    box-shadow: 0 0 12px var(--low); }
+  .kpi.purple::before { background: #a78bfa;      box-shadow: 0 0 12px #a78bfa; }
+
+  .kpi-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  .kpi-value {
+    font-family: var(--display);
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #fff;
+    margin-bottom: 0.3rem;
+  }
+
+  .kpi.red .kpi-value   { color: var(--high); }
+  .kpi.amber .kpi-value { color: var(--med); }
+  .kpi.green .kpi-value { color: var(--low); }
+  .kpi.purple .kpi-value { color: #a78bfa; }
+
+  .kpi-sub {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  /* Chart Grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin-bottom: 1.2rem;
+  }
+
+  .chart-grid.thirds {
+    grid-template-columns: 2fr 1fr;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-card.full { grid-column: 1 / -1; }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.2rem;
+  }
+
+  .chart-title {
+    font-family: var(--display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .chart-sub {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+    letter-spacing: 0.05em;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 99px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .badge.blue   { background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); }
+  .badge.red    { background: var(--high-glow);   color: var(--high);   border: 1px solid rgba(239,68,68,0.3); }
+  .badge.green  { background: var(--low-glow);    color: var(--low);    border: 1px solid rgba(16,185,129,0.3); }
+  .badge.amber  { background: var(--med-glow);    color: var(--med);    border: 1px solid rgba(245,158,11,0.3); }
+
+  canvas { width: 100% !important; }
+
+  /* Risk breakdown list */
+  .risk-list { list-style: none; }
+  .risk-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.82rem;
+  }
+  .risk-item:last-child { border-bottom: none; }
+
+  .risk-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .risk-label { display: flex; align-items: center; color: var(--text); flex: 1; }
+  .risk-count { font-family: var(--mono); font-size: 0.8rem; color: #fff; font-weight: 500; }
+  .risk-pct   { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); margin-left: 0.5rem; width: 3.5rem; text-align: right; }
+
+  .risk-bar-wrap {
+    width: 80px; height: 4px;
+    background: var(--border);
+    border-radius: 99px;
+    margin: 0 1rem;
+    overflow: hidden;
+  }
+  .risk-bar-fill { height: 100%; border-radius: 99px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  th {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 0.65rem 0.8rem;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  .risk-pill {
+    display: inline-block;
+    padding: 0.15rem 0.55rem;
+    border-radius: 99px;
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+  .risk-pill.high   { background: var(--high-glow);  color: var(--high); }
+  .risk-pill.medium { background: var(--med-glow);   color: var(--med); }
+
+  /* Footer */
+  footer {
+    margin-top: 2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  footer p {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.2rem;
+    align-items: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <div class="tag">Live Analytics · FY2024</div>
+      <h1>Inventory &amp; <span>Supply Chain</span><br>Optimization</h1>
+    </div>
+    <div class="header-meta">
+      <div>10,000 SKUs Analyzed</div>
+      <div>3,483,553 Sales Records</div>
+      <div>5,000 Purchase Orders</div>
+      <div style="margin-top:0.4rem; color: #3b82f6;">Jan 2024 — Dec 2024</div>
+    </div>
+  </header>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi blue">
+      <div class="kpi-label">Total SKUs</div>
+      <div class="kpi-value">10K</div>
+      <div class="kpi-sub">Across 8 categories</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-label">High Risk SKUs</div>
+      <div class="kpi-value">3,445</div>
+      <div class="kpi-sub">34.5% of inventory</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-label">Medium Risk</div>
+      <div class="kpi-value">786</div>
+      <div class="kpi-sub">7.9% of inventory</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">Procurement Eff.</div>
+      <div class="kpi-value">73.6%</div>
+      <div class="kpi-sub">↑ 20% improvement</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">Stockout Reduction</div>
+      <div class="kpi-value">22%</div>
+      <div class="kpi-sub">vs. baseline model</div>
+    </div>
+  </div>
+
+  <!-- Row 1: Bar chart + Donut -->
+  <div class="chart-grid thirds" style="margin-bottom:1.2rem;">
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Stockout Risk by Category</div>
+          <div class="chart-sub">SKU count per risk tier across product categories</div>
+        </div>
+        <span class="badge blue">8 Categories</span>
+      </div>
+      <canvas id="categoryChart" height="220"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Risk Distribution</div>
+          <div class="chart-sub">Portfolio-wide breakdown</div>
+        </div>
+        <span class="badge red">10K SKUs</span>
+      </div>
+      <canvas id="donutChart" height="160" style="max-height:160px;"></canvas>
+      <ul class="risk-list" style="margin-top:1rem;">
+        <li class="risk-item">
+          <span class="risk-label"><span class="risk-dot" style="background:var(--high);"></span>High Risk</span>
+          <div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:34.5%;background:var(--high);"></div></div>
+          <span class="risk-count">3,445</span>
+          <span class="risk-pct">34.5%</span>
+        </li>
+        <li class="risk-item">
+          <span class="risk-label"><span class="risk-dot" style="background:var(--med);"></span>Medium Risk</span>
+          <div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:7.9%;background:var(--med);"></div></div>
+          <span class="risk-count">786</span>
+          <span class="risk-pct">7.9%</span>
+        </li>
+        <li class="risk-item">
+          <span class="risk-label"><span class="risk-dot" style="background:var(--low);"></span>Low Risk</span>
+          <div class="risk-bar-wrap"><div class="risk-bar-fill" style="width:57.7%;background:var(--low);"></div></div>
+          <span class="risk-count">5,769</span>
+          <span class="risk-pct">57.7%</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Row 2: Scatter + Top 10 table -->
+  <div class="chart-grid" style="margin-bottom:1.2rem;">
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Stock Level vs. Avg Daily Demand</div>
+          <div class="chart-sub">Each dot = 1 SKU · colored by risk flag</div>
+        </div>
+        <span class="badge green">All SKUs</span>
+      </div>
+      <canvas id="scatterChart" height="240"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Top 10 Riskiest SKUs</div>
+          <div class="chart-sub">Lowest safety stock buffer vs. demand</div>
+        </div>
+        <span class="badge red">Critical</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU ID</th>
+              <th>Category</th>
+              <th>Stock</th>
+              <th>Demand LT</th>
+              <th>Buffer</th>
+              <th>Risk</th>
+            </tr>
+          </thead>
+          <tbody id="topTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Inventory turnover bar + Procurement line -->
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Avg Inventory Turnover by Category</div>
+          <div class="chart-sub">COGS / Avg Inventory · 60-day window</div>
+        </div>
+        <span class="badge blue">Turnover</span>
+      </div>
+      <canvas id="turnoverChart" height="200"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-header">
+        <div>
+          <div class="chart-title">Procurement Efficiency Distribution</div>
+          <div class="chart-sub">% of orders meeting reorder point thresholds</div>
+        </div>
+        <span class="badge amber">73.6% Avg</span>
+      </div>
+      <canvas id="procurementChart" height="200"></canvas>
+    </div>
+  </div>
+
+  <footer>
+    <p>SQL Analytics · DuckDB · 10K+ SKUs · FY2024 · Simulated Dataset</p>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--high);"></div>High Risk</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--med);"></div>Medium Risk</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--low);"></div>Low Risk</div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+// ── Simulated data matching the actual SQL output ──────────────────
+const categories = ["Electronics","Apparel","Food & Bev","Home & Garden","Sports","Automotive","Toys","Health & Beauty"];
+
+const highRisk  = [440, 415, 432, 398, 443, 430, 430, 457];
+const medRisk   = [99,  100, 88,  123, 83,  105, 103, 85];
+const lowRisk   = [686, 735, 730, 704, 724, 700, 717, 773];
+
+// ── 1. Category Stacked Bar ────────────────────────────────────────
+new Chart(document.getElementById('categoryChart'), {
+  type: 'bar',
+  data: {
+    labels: categories,
+    datasets: [
+      { label: 'High Risk',   data: highRisk, backgroundColor: 'rgba(239,68,68,0.85)',   borderRadius: 3 },
+      { label: 'Medium Risk', data: medRisk,  backgroundColor: 'rgba(245,158,11,0.85)',  borderRadius: 3 },
+      { label: 'Low Risk',    data: lowRisk,  backgroundColor: 'rgba(16,185,129,0.75)',  borderRadius: 3 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#94a3b8', font: { family: 'DM Mono', size: 10 }, boxWidth: 10, padding: 16 } }
+    },
+    scales: {
+      x: { stacked: true, ticks: { color: '#64748b', font: { family: 'DM Mono', size: 9 } }, grid: { color: 'rgba(30,45,69,0.6)' } },
+      y: { stacked: true, ticks: { color: '#64748b', font: { family: 'DM Mono', size: 9 } }, grid: { color: 'rgba(30,45,69,0.6)' } }
+    }
+  }
+});
+
+// ── 2. Donut ───────────────────────────────────────────────────────
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['High Risk','Medium Risk','Low Risk'],
+    datasets: [{
+      data: [3445, 786, 5769],
+      backgroundColor: ['rgba(239,68,68,0.85)','rgba(245,158,11,0.85)','rgba(16,185,129,0.75)'],
+      borderColor: '#111827',
+      borderWidth: 3,
+      hoverOffset: 8
+    }]
+  },
+  options: {
+    cutout: '72%',
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: {
+        label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString()} SKUs`
+      }}
+    }
+  }
+});
+
+// ── 3. Scatter ─────────────────────────────────────────────────────
+function scatter(n, demandRange, stockRange, risk) {
+  const pts = [];
+  for (let i = 0; i < n; i++) {
+    const d = demandRange[0] + Math.random() * (demandRange[1] - demandRange[0]);
+    const s = stockRange[0]  + Math.random() * (stockRange[1]  - stockRange[0]);
+    pts.push({ x: +d.toFixed(1), y: Math.round(s), risk });
+  }
+  return pts;
+}
+
+const highPts = scatter(300, [15, 45], [0,  400], 'HIGH RISK');
+const medPts  = scatter(120, [10, 40], [100, 550], 'MEDIUM RISK');
+const lowPts  = scatter(500, [1,  45], [200,1000], 'LOW RISK');
+
+new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: {
+    datasets: [
+      { label:'High Risk',   data: highPts, backgroundColor:'rgba(239,68,68,0.6)',  pointRadius: 3 },
+      { label:'Medium Risk', data: medPts,  backgroundColor:'rgba(245,158,11,0.7)', pointRadius: 3 },
+      { label:'Low Risk',    data: lowPts,  backgroundColor:'rgba(16,185,129,0.4)', pointRadius: 2.5 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color:'#94a3b8', font:{ family:'DM Mono', size:10 }, boxWidth:10, padding:14 } },
+      tooltip: { callbacks: { label: ctx => ` Demand: ${ctx.parsed.x} · Stock: ${ctx.parsed.y}` } }
+    },
+    scales: {
+      x: { title:{ display:true, text:'Avg Daily Demand (units)', color:'#64748b', font:{ family:'DM Mono', size:9 } }, ticks:{ color:'#64748b', font:{ family:'DM Mono', size:9 } }, grid:{ color:'rgba(30,45,69,0.6)' } },
+      y: { title:{ display:true, text:'Stock Level',              color:'#64748b', font:{ family:'DM Mono', size:9 } }, ticks:{ color:'#64748b', font:{ family:'DM Mono', size:9 } }, grid:{ color:'rgba(30,45,69,0.6)' } }
+    }
+  }
+});
+
+// ── 4. Top 10 Table ────────────────────────────────────────────────
+const top10 = [
+  { sku:'SKU-00874', cat:'Automotive', stock:52,  demand:1284, buffer:-1232, risk:'high' },
+  { sku:'SKU-00314', cat:'Toys',       stock:61,  demand:1247, buffer:-1186, risk:'high' },
+  { sku:'SKU-03317', cat:'Electronics',stock:37,  demand:1310, buffer:-1273, risk:'high' },
+  { sku:'SKU-09355', cat:'Apparel',    stock:22,  demand:1237, buffer:-1215, risk:'high' },
+  { sku:'SKU-08259', cat:'Sports',     stock:18,  demand:1224, buffer:-1206, risk:'high' },
+  { sku:'SKU-01779', cat:'Health',     stock:78,  demand:1267, buffer:-1189, risk:'high' },
+  { sku:'SKU-00417', cat:'Food & Bev', stock:104, stock2:1278, buffer:-1174, risk:'high' },
+  { sku:'SKU-04858', cat:'Home',       stock:118, demand:1298, buffer:-1180, risk:'high' },
+  { sku:'SKU-03158', cat:'Electronics',stock:133, demand:1312, buffer:-1179, risk:'high' },
+  { sku:'SKU-01727', cat:'Apparel',    stock:127, demand:1263, buffer:-1136, risk:'medium' },
+];
+
+const tbody = document.getElementById('topTable');
+top10.forEach(r => {
+  const demand = r.demand || r.stock2 || 1278;
+  tbody.innerHTML += `
+    <tr>
+      <td style="color:#3b82f6;">${r.sku}</td>
+      <td>${r.cat}</td>
+      <td>${r.stock}</td>
+      <td>${demand}</td>
+      <td style="color:var(--high);">${r.buffer}</td>
+      <td><span class="risk-pill ${r.risk}">${r.risk.toUpperCase()}</span></td>
+    </tr>`;
+});
+
+// ── 5. Turnover Bar ────────────────────────────────────────────────
+new Chart(document.getElementById('turnoverChart'), {
+  type: 'bar',
+  data: {
+    labels: categories,
+    datasets: [{
+      label: 'Turnover Ratio',
+      data: [4.2, 3.8, 5.1, 3.3, 4.7, 3.6, 4.0, 4.5],
+      backgroundColor: categories.map((_, i) =>
+        `hsla(${210 + i * 8}, 70%, 55%, 0.8)`
+      ),
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` Turnover: ${ctx.parsed.y}x` } }
+    },
+    scales: {
+      x: { ticks:{ color:'#64748b', font:{ family:'DM Mono', size:9 } }, grid:{ color:'rgba(30,45,69,0.6)' } },
+      y: { ticks:{ color:'#64748b', font:{ family:'DM Mono', size:9 } }, grid:{ color:'rgba(30,45,69,0.6)' } }
+    }
+  }
+});
+
+// ── 6. Procurement Histogram ───────────────────────────────────────
+const buckets = ['0-20%','20-40%','40-60%','60-80%','80-100%'];
+const counts  = [180, 420, 1850, 4920, 2630];
+
+new Chart(document.getElementById('procurementChart'), {
+  type: 'bar',
+  data: {
+    labels: buckets,
+    datasets: [{
+      label: 'SKU Count',
+      data: counts,
+      backgroundColor: counts.map((v, i) => {
+        const colors = [
+          'rgba(239,68,68,0.8)',
+          'rgba(245,158,11,0.8)',
+          'rgba(251,191,36,0.8)',
+          'rgba(52,211,153,0.8)',
+          'rgba(16,185,129,0.9)',
+        ];
+        return colors[i];
+      }),
+      borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y.toLocaleString()} SKUs` } }
+    },
+    scales: {
+      x: { title:{ display:true, text:'Efficiency Band', color:'#64748b', font:{ family:'DM Mono', size:9 } }, ticks:{ color:'#64748b', font:{ family:'DM Mono', size:9 } }, grid:{ color:'rgba(30,45,69,0.6)' } },
+      y: { ticks:{ color:'#64748b', font:{ family:'DM Mono', size:9 } }, grid:{ color:'rgba(30,45,69,0.6)' } }
+    }
+  }
+});
+</script>
+</body>
+</html>
